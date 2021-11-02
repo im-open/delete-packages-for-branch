@@ -1,15 +1,23 @@
-name: 'JavaScript Action Template'
+name: 'delete-branch-package-versions'
 
-description: 'Add description here'
+description: 'An action to delete pre-release GH Package versions created for a specified branch'
 
 inputs:
-  input-1:
-    description: 'Add a description here'
+  github-token:
+    description: 'A token with permission to delete github package versions in the organization.'
     required: true
-
-outputs:
-  output-1:
-    description: 'Add a description here'
+  organization:
+    description: 'The branch the packages were created for.  Defaults to github.context.repo.org if not provided.'
+    required: false
+  branch-name:
+    description: 'The branch the packages were created for.'
+    required: true
+  package-type:
+    description: 'The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.'
+    required: true
+  package-name:
+    description: 'The name of the package that versions will be deleted from.'
+    required: true
 
 runs:
   using: 'node12'
