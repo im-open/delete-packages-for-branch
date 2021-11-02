@@ -6,13 +6,13 @@ This action will retrieve the list of versions for a GH Package in the provided 
 If the action runs into an issue deleting a specific package version, it will generate a warning that can be viewed in the Summary section of the workflow rather than failing.  Errors retrieving the package versions will still cause the action to fail though.
 
 ## Inputs
-| Parameter      | Is Required | Description                                                                                                                                                        |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `github-token` | true        | A token with permission with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are. |
-| `organization` | false       | The branch the packages were created for.  Defaults to `github.context.repo.org` if not provided.                                                                  |
-| `branch-name`  | true        | The branch the packages were created for.                                                                                                                          |
-| `package-type` | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                               |
-| `package-name` | true        | The name of the package that versions will be deleted from.                                                                                                        |
+| Parameter      | Is Required | Description                                                                                                                                                |
+| -------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token` | true        | An access token with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are. |
+| `organization` | false       | The organization the packages were created in.  Defaults to `github.context.repo.org` if not provided.                                                     |
+| `branch-name`  | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                    |
+| `package-type` | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                       |
+| `package-name` | true        | The name of the package that versions will be deleted from.                                                                                                |
 
 ## Outputs
 No Outputs

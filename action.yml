@@ -4,13 +4,13 @@ description: 'An action to delete pre-release GH Package versions created for a 
 
 inputs:
   github-token:
-    description: 'A token with permission to delete github package versions in the organization.'
+    description: 'An access token with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are.'
     required: true
   organization:
-    description: 'The branch the packages were created for.  Defaults to github.context.repo.org if not provided.'
+    description: 'The organization the packages were created in.  Defaults to github.context.repo.org if not provided.'
     required: false
   branch-name:
-    description: 'The branch the packages were created for.'
+    description: 'The branch name the packages were created with.  This is how package versions to delete are identified.'
     required: true
   package-type:
     description: 'The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.'
