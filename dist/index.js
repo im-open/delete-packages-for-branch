@@ -15623,8 +15623,12 @@ async function getListOfPackages() {
       core.setFailed(`An error occurred retrieving page ${page} of packages.`);
     }
   }
-  core.info('Finished gathering packages, the following items will be removed:');
-  console.log(packagesToDelete);
+  if (packagesToDelete.length === 0) {
+    core.info('Finished gathering packages, there were no items to removed.');
+  } else {
+    core.info('Finished gathering packages, the following items will be removed:');
+    console.log(packagesToDelete);
+  }
   return packagesToDelete;
 }
 async function deletePackage(package2) {

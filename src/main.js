@@ -63,8 +63,12 @@ async function getListOfPackages() {
     }
   }
 
-  core.info('Finished gathering packages, the following items will be removed:');
-  console.log(packagesToDelete); //Normally I'd make this core.info but it doesn't print right with JSON.stringify()
+  if (packagesToDelete.length === 0) {
+    core.info('Finished gathering packages, there were no items to removed.');
+  } else {
+    core.info('Finished gathering packages, the following items will be removed:');
+    console.log(packagesToDelete); //Normally I'd make this core.info but it doesn't print right with JSON.stringify()
+  }
 
   return packagesToDelete;
 }
