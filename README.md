@@ -5,6 +5,17 @@ This action will retrieve the list of versions for a GH Package in the provided 
 
 If the action runs into an issue deleting a specific package version, it will generate a warning that can be viewed in the Summary section of the workflow rather than failing.  Errors retrieving the package versions will still cause the action to fail though.
 
+## Index
+
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+- [Usage Examples](#usage-examples)
+- [Contributing](#contributing)
+  - [Recompiling](#recompiling)
+  - [Incrementing the Version](#incrementing-the-version)
+- [Code of Conduct](#code-of-conduct)
+- [License](#license)
+  
 ## Inputs
 | Parameter      | Is Required | Description                                                                                                                                                |
 | -------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -29,7 +40,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v1.0.0
+        uses: im-open/delete-branch-package-versions@v1.0.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'myOrg'
@@ -38,7 +49,15 @@ jobs:
           package-name: 'my-pkg'
 ```
 
-## Recompiling
+## Contributing
+
+When creating new PRs please ensure:
+1. The action has been recompiled.  See the [Recompiling](#recompiling) section below for more details.
+2. For major or minor changes, at least one of the commit messages contains the appropriate `+semver:` keywords listed under [Incrementing the Version](#incrementing-the-version).
+3. The `README.md` example has been updated with the new version.  See [Incrementing the Version](#incrementing-the-version).
+4. The action code does not contain sensitive information.
+
+### Recompiling
 
 If changes are made to the action's code in this repository, or its dependencies, you will need to re-compile the action.
 
@@ -53,7 +72,7 @@ npm run bundle
 These commands utilize [esbuild](https://esbuild.github.io/getting-started/#bundling-for-node) to bundle the action and
 its dependencies into a single file located in the `dist` folder.
 
-## Incrementing the Version
+### Incrementing the Version
 
 This action uses [git-version-lite] to examine commit messages to determine whether to perform a major, minor or patch increment on merge.  The following table provides the fragment that should be included in a commit message to active different increment strategies.
 | Increment Type | Commit Message Fragment                     |
