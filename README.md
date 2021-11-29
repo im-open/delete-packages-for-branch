@@ -91,4 +91,5 @@ This project has adopted the [im-open's Code of Conduct](https://github.com/im-o
 
 Copyright &copy; 2021, Extend Health, LLC. Code released under the [MIT license](LICENSE).
 
+[im-open/git-version-lite]: https://github.com/im-open/git-version-lite
 [git-version-lite]: https://github.com/im-open/git-version-lite
