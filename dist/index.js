@@ -344,8 +344,8 @@ var require_context = __commonJS({
       }
       get repo() {
         if (process.env.GITHUB_REPOSITORY) {
-          const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
-          return { owner, repo };
+          const [owner, repo2] = process.env.GITHUB_REPOSITORY.split('/');
+          return { owner, repo: repo2 };
         }
         if (this.payload.repository) {
           return {
@@ -13380,7 +13380,7 @@ var require_dist_node6 = __commonJS({
     ];
     var FORBIDDEN_VARIABLE_OPTIONS = ['query', 'method', 'url'];
     var GHES_V3_SUFFIX_REGEX = /\/api\/v3\/?$/;
-    function graphql(request2, query, options) {
+    function graphql2(request2, query, options) {
       if (options) {
         if (typeof query === 'string' && 'query' in options) {
           return Promise.reject(
@@ -13432,7 +13432,7 @@ var require_dist_node6 = __commonJS({
     function withDefaults(request$1, newDefaults) {
       const newRequest = request$1.defaults(newDefaults);
       const newApi = (query, options) => {
-        return graphql(newRequest, query, options);
+        return graphql2(newRequest, query, options);
       };
       return Object.assign(newApi, {
         defaults: withDefaults.bind(null, newRequest),
@@ -13519,7 +13519,7 @@ var require_dist_node8 = __commonJS({
     var universalUserAgent = require_dist_node();
     var beforeAfterHook = require_before_after_hook();
     var request = require_dist_node5();
-    var graphql = require_dist_node6();
+    var graphql2 = require_dist_node6();
     var authToken = require_dist_node7();
     function _objectWithoutPropertiesLoose(source, excluded) {
       if (source == null) return {};
@@ -13580,7 +13580,7 @@ var require_dist_node8 = __commonJS({
           requestDefaults.headers['time-zone'] = options.timeZone;
         }
         this.request = request.request.defaults(requestDefaults);
-        this.graphql = graphql.withCustomRequest(this.request).defaults(requestDefaults);
+        this.graphql = graphql2.withCustomRequest(this.request).defaults(requestDefaults);
         this.log = Object.assign(
           {
             debug: () => {},
@@ -15593,6 +15593,7 @@ var require_github = __commonJS({
 // src/main.js
 var core = require_core();
 var github = require_github();
+var { graphql } = require_dist_node6();
 var requiredArgOptions = {
   required: true,
   trimWhitespace: true
@@ -15600,7 +15601,8 @@ var requiredArgOptions = {
 var token = core.getInput('github-token', requiredArgOptions);
 var branchNameInput = core.getInput('branch-name', requiredArgOptions);
 var packageType = core.getInput('package-type', requiredArgOptions);
-var packageName = core.getInput('package-name', requiredArgOptions);
+var packageNames = core.getInput('package-names');
+var repo = github.context.repo.repo;
 var org = core.getInput('organization');
 if (!org && org.length === 0) {
   org = github.context.repo.owner;
@@ -15608,63 +15610,68 @@ if (!org && org.length === 0) {
 var branchName = branchNameInput.replace('refs/heads/', '').replace(/[^a-zA-Z0-9-]/g, '-');
 var branchPattern = `-${branchName}.`;
 var octokit = github.getOctokit(token);
-async function getListOfPackages() {
-  let hasMorePackages = true;
-  let packagesToDelete = [];
-  let page = 1;
-  const maxResultsPerPage = 50;
-  core.info(`Gathering list of packages with '${branchPattern}' in the name or tag to delete...`);
-  while (hasMorePackages) {
-    const response = await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
-      org,
-      package_type: packageType,
-      package_name: packageName,
-      per_page: maxResultsPerPage,
-      page
-    });
-    if (response.status == 200) {
-      if (response.data) {
-        if (response.data.length < maxResultsPerPage) {
-          hasMorePackages = false;
-        } else {
-          page += 1;
-        }
-        for (let index = 0; index < response.data.length; index++) {
-          const package2 = response.data[index];
-          if (package2.name.indexOf(branchPattern) > -1) {
-            packagesToDelete.push({
-              name: package2.name,
-              id: package2.id
-            });
-          } else {
-            core.info(`Package ${package2.name} does not meet the pattern and will not be deleted`);
+var graphqlWithAuth = graphql.defaults({
+  headers: {
+    authorization: `token ${token}`
+  }
+});
+async function getAllPackagesForRepo() {
+  core.info('Querying for all of the packages in the repo.\n');
+  const query = `
+  query {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(packageType: ${packageType.toUpperCase()}, first: 100){
+        totalCount
+        nodes {
+          name
+          id
+          versions(last: 100) {
+            nodes {
+              id,
+              version
+            }
           }
         }
-      } else {
-        core.info('Finished getting packages for the repository.');
-      }
-    } else {
-      core.setFailed(`An error occurred retrieving page ${page} of packages.`);
+      } 
     }
   }
-  if (packagesToDelete.length === 0) {
-    core.info('Finished gathering packages, there were no items to removed.');
-  } else {
-    core.info('Finished gathering packages, the following items will be removed:');
-    console.log(packagesToDelete);
-  }
-  return packagesToDelete;
+  `;
+  const response = await graphqlWithAuth(query);
+  core.info(`Successfully recieved ${response.repository.packages.totalCount} packages.`);
+  response.repository.packages.nodes.forEach(node => {
+    core.info(node.name);
+  });
+  core.info(' ');
+  return response.repository.packages.nodes.flatMap(package2 =>
+    package2.versions.nodes.map(version => ({ name: version.version, id: version.id }))
+  );
 }
-async function deletePackage(package2) {
+function filterPackages(packages) {
+  const filteredPackages = packages.filter(package2 => {
+    const shouldDelete = package2.name.indexOf(branchPattern) > -1;
+    if (!shouldDelete) {
+      core.info(`Package ${package2.name} does not meet the pattern and will not be deleted`);
+    }
+    return shouldDelete;
+  });
+  core.info('Finished gathering packages, the following items will be removed:');
+  console.log(filteredPackages);
+  return filteredPackages;
+}
+async function deletePackageViaGraphql(package2) {
   try {
     core.info(`
-Deleting package ${package2.name} (${package2.id})...`);
-    await octokit.rest.packages.deletePackageVersionForOrg({
-      package_type: packageType,
-      package_name: packageName,
-      org,
-      package_version_id: package2.id
-    });
+Deleting package ${package2.name} (${package2.id}) (org: ${org} type: ${packageType})...`);
+    const query = `
+    mutation {
+      deletePackageVersion(input: {packageVersionId: "${package2.id}"}) {
+        success
+      }
+    }
+    `;
+    const response = await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
+    core.info(`Response:`);
+    console.log(repsonse);
     core.info(`Finished deleting package: ${package2.name} (${package2.id}).`);
   } catch (error) {
     core.warning(
@@ -15673,10 +15680,13 @@ Deleting package ${package2.name} (${package2.id})...`);
   }
 }
 async function run() {
-  let packagesToDelete = await getListOfPackages();
-  for (let index = 0; index < packagesToDelete.length; index++) {
-    await deletePackage(packagesToDelete[index]);
+  let packagesToDelete = !!packageNames
+    ? packageNames.split(',').map(package2 => package2.trim())
+    : filterPackages(await getAllPackagesForRepo());
+  for (const package2 of packagesToDelete) {
+    await deletePackageViaGraphql(package2);
   }
+  core.info('\nFinished deleting packages.');
 }
 run();
 /*!
