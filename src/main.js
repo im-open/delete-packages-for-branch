@@ -10,8 +10,12 @@ const requiredArgOptions = {
 const token = core.getInput('github-token', requiredArgOptions);
 const branchNameInput = core.getInput('branch-name', requiredArgOptions);
 const packageType = core.getInput('package-type', requiredArgOptions);
-const packageNames = core.getInput('package-names');
+const packageNamesInput = core.getInput('package-names');
+const packageNames = !!packageNamesInput
+  ? packageNamesInput.split(',').map(package => package.trim())
+  : [];
 const repo = github.context.repo.repo;
+const checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
 
 let org = core.getInput('organization');
 if (!org && org.length === 0) {
@@ -39,7 +43,8 @@ async function getAllPackagesForRepo() {
           versions(last: 100) {
             nodes {
               id,
-              version
+              version,
+              preRelease
             }
           }
         }
@@ -60,30 +65,34 @@ async function getAllPackagesForRepo() {
     package.versions.nodes.map(version => ({
       packageName: package.name,
       versionName: version.version,
-      id: version.id
+      id: version.id,
+      isPreRelease: checkForPreReleaseRegex.test(version.version)
     }))
   );
 }
 
-function filterPackagesByName(packages) {
-  if (!packageNames) {
-    return packages;
-  }
-
-  const packageNamesArray = packageNames.split(',').map(package => package.trim());
-
-  return packages.filter(package => packageNamesArray.includes(package.packageName));
-}
-
-function filterPackageVersionsByBranchPattern(packages) {
+function filterPackages(packages) {
   const filteredPackages = packages.filter(package => {
-    const shouldDelete = package.versionName.indexOf(branchPattern) > -1;
+    const versionContainsBranchPattern = package.versionName.indexOf(branchPattern) > -1;
+    const packageWasRequestedByInput =
+      !packageNames.length || packageNames.includes(package.packageName);
+    const versionIsPreRelease = package.isPreRelease;
 
-    if (!shouldDelete) {
-      core.info(`Package ${package.versionName} does not meet the pattern and will not be deleted`);
+    if (!packageWasRequestedByInput) {
+      core.info(
+        `Package ${package.versionName} was not in the list of package names from the input parameters.`
+      );
+    } else if (!versionIsPreRelease) {
+      core.info(
+        `Package ${package.versionName} is not a prerelease package so it will not be deleted.`
+      );
+    } else if (!versionContainsBranchPattern) {
+      core.info(
+        `Package ${package.versionName} does not meet the pattern and will not be deleted.`
+      );
     }
 
-    return shouldDelete;
+    return packageWasRequestedByInput && versionIsPreRelease && versionContainsBranchPattern;
   });
 
   core.info('Finished gathering packages, the following items will be removed:');
@@ -118,9 +127,7 @@ async function deletePackage(package) {
 
 async function run() {
   const packagesInRepo = await getAllPackagesForRepo();
-  const packagesToDelete = filterPackageVersionsByBranchPattern(
-    filterPackagesByName(packagesInRepo)
-  );
+  const packagesToDelete = filterPackages(packagesInRepo);
 
   for (const package of packagesToDelete) {
     await deletePackage(package);
