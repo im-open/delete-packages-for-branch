@@ -7,29 +7,32 @@ If the action runs into an issue deleting a specific package version, it will ge
 
 ## Index
 
-- [Inputs](#inputs)
-- [Outputs](#outputs)
-- [Usage Examples](#usage-examples)
-- [Contributing](#contributing)
-  - [Recompiling](#recompiling)
-  - [Incrementing the Version](#incrementing-the-version)
-- [Code of Conduct](#code-of-conduct)
-- [License](#license)
+- [delete-branch-package-versions](#delete-branch-package-versions)
+  - [Index](#index)
+  - [Inputs](#inputs)
+  - [Outputs](#outputs)
+  - [Usage Examples](#usage-examples)
+  - [Contributing](#contributing)
+    - [Recompiling](#recompiling)
+    - [Incrementing the Version](#incrementing-the-version)
+  - [Code of Conduct](#code-of-conduct)
+  - [License](#license)
   
 ## Inputs
-| Parameter      | Is Required | Description                                                                                                                                                |
-| -------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `github-token` | true        | An access token with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are. |
-| `organization` | false       | The organization the packages were created in.  Defaults to `github.context.repo.org` if not provided.                                                     |
-| `branch-name`  | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                    |
-| `package-type` | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                       |
-| `package-name` | true        | The name of the package that versions will be deleted from.                                                                                                |
+| Parameter       | Is Required | Description                                                                                                                                                                                                   |
+| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token`  | true        | An access token with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are.                                                    |
+| `organization`  | false       | The organization the packages were created in.  Defaults to `github.context.repo.org` if not provided.                                                                                                        |
+| `branch-name`   | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                                                                       |
+| `package-type`  | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                                                                          |
+| `package-names` | false       | The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If ommitted, it will default to all of the packages in the current repo. |
 
 ## Outputs
 No Outputs
 
 ## Usage Examples
 
+*Delete versions of one package*
 ```yml
 on:
   pull_request:
@@ -40,13 +43,52 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v1.0.4
+        uses: im-open/delete-branch-package-versions@v2.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'myOrg'
           branch-name: ${{ github.head_ref }}
           package-type: 'npm'
-          package-name: 'my-pkg'
+          package-names: 'my-pkg'
+```
+
+*Delete versions of multiple packages*
+```yml
+on:
+  pull_request:
+    types: [closed]
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Clean up the GitHub package versions that were created for this branch
+        uses: im-open/delete-branch-package-versions@v2.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: 'myOrg'
+          branch-name: ${{ github.head_ref }}
+          package-type: 'npm'
+          package-names: 'my-pkg, another-pkg'
+```
+
+*Delete versions of every package in the repository in which the workflow is run*
+```yml
+on:
+  pull_request:
+    types: [closed]
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Clean up the GitHub package versions that were created for this branch
+        uses: im-open/delete-branch-package-versions@v2.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: 'myOrg'
+          branch-name: ${{ github.head_ref }}
+          package-type: 'npm'
 ```
 
 ## Contributing
