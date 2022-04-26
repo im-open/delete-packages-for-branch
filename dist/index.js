@@ -14993,7 +14993,7 @@ var require_dist_node9 = __commonJS({
       }
     };
     var VERSION = '5.13.0';
-    function endpointsToMethods(octokit2, endpointsMap) {
+    function endpointsToMethods(octokit, endpointsMap) {
       const newMethods = {};
       for (const [scope, endpoints] of Object.entries(endpointsMap)) {
         for (const [methodName, endpoint] of Object.entries(endpoints)) {
@@ -15012,7 +15012,7 @@ var require_dist_node9 = __commonJS({
           const scopeMethods = newMethods[scope];
           if (decorations) {
             scopeMethods[methodName] = decorate(
-              octokit2,
+              octokit,
               scope,
               methodName,
               endpointDefaults,
@@ -15020,13 +15020,13 @@ var require_dist_node9 = __commonJS({
             );
             continue;
           }
-          scopeMethods[methodName] = octokit2.request.defaults(endpointDefaults);
+          scopeMethods[methodName] = octokit.request.defaults(endpointDefaults);
         }
       }
       return newMethods;
     }
-    function decorate(octokit2, scope, methodName, defaults, decorations) {
-      const requestWithDefaults = octokit2.request.defaults(defaults);
+    function decorate(octokit, scope, methodName, defaults, decorations) {
+      const requestWithDefaults = octokit.request.defaults(defaults);
       function withDecorations(...args) {
         let options = requestWithDefaults.endpoint.merge(...args);
         if (decorations.mapToData) {
@@ -15038,18 +15038,18 @@ var require_dist_node9 = __commonJS({
         }
         if (decorations.renamed) {
           const [newScope, newMethodName] = decorations.renamed;
-          octokit2.log.warn(
+          octokit.log.warn(
             `octokit.${scope}.${methodName}() has been renamed to octokit.${newScope}.${newMethodName}()`
           );
         }
         if (decorations.deprecated) {
-          octokit2.log.warn(decorations.deprecated);
+          octokit.log.warn(decorations.deprecated);
         }
         if (decorations.renamedParameters) {
           const options2 = requestWithDefaults.endpoint.merge(...args);
           for (const [name, alias] of Object.entries(decorations.renamedParameters)) {
             if (name in options2) {
-              octokit2.log.warn(
+              octokit.log.warn(
                 `"${name}" parameter is deprecated for "octokit.${scope}.${methodName}()". Use "${alias}" instead`
               );
               if (!(alias in options2)) {
@@ -15064,15 +15064,15 @@ var require_dist_node9 = __commonJS({
       }
       return Object.assign(withDecorations, requestWithDefaults);
     }
-    function restEndpointMethods(octokit2) {
-      const api = endpointsToMethods(octokit2, Endpoints);
+    function restEndpointMethods(octokit) {
+      const api = endpointsToMethods(octokit, Endpoints);
       return {
         rest: api
       };
     }
     restEndpointMethods.VERSION = VERSION;
-    function legacyRestEndpointMethods(octokit2) {
-      const api = endpointsToMethods(octokit2, Endpoints);
+    function legacyRestEndpointMethods(octokit) {
+      const api = endpointsToMethods(octokit, Endpoints);
       return _objectSpread2(
         _objectSpread2({}, api),
         {},
@@ -15167,12 +15167,12 @@ var require_dist_node10 = __commonJS({
       response.data.total_count = totalCount;
       return response;
     }
-    function iterator(octokit2, route, parameters) {
+    function iterator(octokit, route, parameters) {
       const options =
         typeof route === 'function'
           ? route.endpoint(parameters)
-          : octokit2.request.endpoint(route, parameters);
-      const requestMethod = typeof route === 'function' ? route : octokit2.request;
+          : octokit.request.endpoint(route, parameters);
+      const requestMethod = typeof route === 'function' ? route : octokit.request;
       const method = options.method;
       const headers = options.headers;
       let url = options.url;
@@ -15210,19 +15210,19 @@ var require_dist_node10 = __commonJS({
         })
       };
     }
-    function paginate(octokit2, route, parameters, mapFn) {
+    function paginate(octokit, route, parameters, mapFn) {
       if (typeof parameters === 'function') {
         mapFn = parameters;
         parameters = void 0;
       }
       return gather(
-        octokit2,
+        octokit,
         [],
-        iterator(octokit2, route, parameters)[Symbol.asyncIterator](),
+        iterator(octokit, route, parameters)[Symbol.asyncIterator](),
         mapFn
       );
     }
-    function gather(octokit2, results, iterator2, mapFn) {
+    function gather(octokit, results, iterator2, mapFn) {
       return iterator2.next().then(result => {
         if (result.done) {
           return results;
@@ -15235,7 +15235,7 @@ var require_dist_node10 = __commonJS({
         if (earlyExit) {
           return results;
         }
-        return gather(octokit2, results, iterator2, mapFn);
+        return gather(octokit, results, iterator2, mapFn);
       });
     }
     var composePaginateRest = Object.assign(paginate, {
@@ -15448,10 +15448,10 @@ var require_dist_node10 = __commonJS({
         return false;
       }
     }
-    function paginateRest(octokit2) {
+    function paginateRest(octokit) {
       return {
-        paginate: Object.assign(paginate.bind(null, octokit2), {
-          iterator: iterator.bind(null, octokit2)
+        paginate: Object.assign(paginate.bind(null, octokit), {
+          iterator: iterator.bind(null, octokit)
         })
       };
     }
@@ -15609,7 +15609,6 @@ if (!org && org.length === 0) {
 }
 var branchName = branchNameInput.replace('refs/heads/', '').replace(/[^a-zA-Z0-9-]/g, '-');
 var branchPattern = `-${branchName}.`;
-var octokit = github.getOctokit(token);
 var graphqlWithAuth = graphql.defaults({
   headers: {
     authorization: `token ${token}`
@@ -15643,14 +15642,27 @@ async function getAllPackagesForRepo() {
   });
   core.info(' ');
   return response.repository.packages.nodes.flatMap(package2 =>
-    package2.versions.nodes.map(version => ({ name: version.version, id: version.id }))
+    package2.versions.nodes.map(version => ({
+      packageName: package2.name,
+      versionName: version.version,
+      id: version.id
+    }))
   );
 }
-function filterPackages(packages) {
+function filterPackagesByName(packages) {
+  if (!packageNames) {
+    return packages;
+  }
+  const packageNamesArray = packageNames.split(',').map(package2 => package2.trim());
+  return packages.filter(package2 => packageNamesArray.includes(package2.packageName));
+}
+function filterPackageVersionsByBranchPattern(packages) {
   const filteredPackages = packages.filter(package2 => {
-    const shouldDelete = package2.name.indexOf(branchPattern) > -1;
+    const shouldDelete = package2.versionName.indexOf(branchPattern) > -1;
     if (!shouldDelete) {
-      core.info(`Package ${package2.name} does not meet the pattern and will not be deleted`);
+      core.info(
+        `Package ${package2.versionName} does not meet the pattern and will not be deleted`
+      );
     }
     return shouldDelete;
   });
@@ -15658,10 +15670,10 @@ function filterPackages(packages) {
   console.log(filteredPackages);
   return filteredPackages;
 }
-async function deletePackageViaGraphql(package2) {
+async function deletePackage(package2) {
   try {
     core.info(`
-Deleting package ${package2.name} (${package2.id}) (org: ${org} type: ${packageType})...`);
+Deleting package ${package2.versionName} (${package2.id}) (org: ${org} type: ${packageType})...`);
     const query = `
     mutation {
       deletePackageVersion(input: {packageVersionId: "${package2.id}"}) {
@@ -15669,22 +15681,21 @@ Deleting package ${package2.name} (${package2.id}) (org: ${org} type: ${packageT
       }
     }
     `;
-    const response = await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
-    core.info(`Response:`);
-    console.log(repsonse);
-    core.info(`Finished deleting package: ${package2.name} (${package2.id}).`);
+    await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
+    core.info(`Finished deleting package: ${package2.versionName} (${package2.id}).`);
   } catch (error) {
     core.warning(
-      `There was an error deleting the package ${package2.name} (${package2.id}): ${error.message}`
+      `There was an error deleting the package ${package2.versionName} (${package2.id}): ${error.message}`
     );
   }
 }
 async function run() {
-  let packagesToDelete = !!packageNames
-    ? packageNames.split(',').map(package2 => package2.trim())
-    : filterPackages(await getAllPackagesForRepo());
+  const packagesInRepo = await getAllPackagesForRepo();
+  const packagesToDelete = filterPackageVersionsByBranchPattern(
+    filterPackagesByName(packagesInRepo)
+  );
   for (const package2 of packagesToDelete) {
-    await deletePackageViaGraphql(package2);
+    await deletePackage(package2);
   }
   core.info('\nFinished deleting packages.');
 }
