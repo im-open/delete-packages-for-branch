@@ -46,7 +46,7 @@ jobs:
         uses: im-open/delete-branch-package-versions@v2.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: 'myOrg'
+          organization: ${{ github.repository_owner }}
           branch-name: ${{ github.head_ref }}
           package-type: 'npm'
           package-names: 'my-pkg'
@@ -66,11 +66,10 @@ jobs:
         uses: im-open/delete-branch-package-versions@v2.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: 'myOrg'
+          organization: ${{ github.repository_owner }}
           branch-name: ${{ github.head_ref }}
-          package-type: 'npm'
-          package-names: 'my-pkg, another-pkg'
-```
+          package-type: 'nuget'
+          package-names: 'Some.Package.Name, Another.Package'
 
 *Delete versions of every package in the repository in which the workflow is run*
 ```yml
