@@ -30,6 +30,72 @@ const graphqlWithAuth = graphql.defaults({
   }
 });
 
+async function getAllPackageVersions(packageName) {
+  const initialQuery = `
+  query {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(names: ["${packageName}"], first: 1){
+        totalCount
+        nodes {
+          name
+          id
+          versions(first: 100) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id,
+              version
+            }
+          }
+        }
+      } 
+    }
+  }
+  `;
+  const paginatedQuery = `
+  query getPackageVersions($cursor: String!) {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(names: ["${packageName}"], first: 1){
+        totalCount
+        nodes {
+          name
+          id
+          versions(first: 100, after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id,
+              version
+            }
+          }
+        }
+      } 
+    }
+  }
+  `;
+  let packageVersions = [];
+  let hasNextPage = true;
+  let currentCursor = '';
+
+  while (hasNextPage) {
+    const response =
+      currentCursor === ''
+        ? await graphqlWithAuth(initialQuery)
+        : await graphqlWithAuth(paginatedQuery, { cursor: currentCursor });
+    const pageVersions = response.repository.packages.nodes[0].versions;
+    hasNextPage = pageVersions.pageInfo.hasNextPage;
+    currentCursor = pageVersions.pageInfo.endCursor;
+
+    packageVersions = packageVersions.concat(pageVersions.nodes);
+  }
+
+  return packageVersions;
+}
+
 async function getAllPackagesForRepo() {
   core.info('Querying for all of the packages in the repo.\n');
   const query = `
@@ -40,13 +106,6 @@ async function getAllPackagesForRepo() {
         nodes {
           name
           id
-          versions(last: 100) {
-            nodes {
-              id,
-              version,
-              preRelease
-            }
-          }
         }
       } 
     }
@@ -61,35 +120,37 @@ async function getAllPackagesForRepo() {
   // Add some space between the list of packages and the following logs.
   core.info(' ');
 
-  return response.repository.packages.nodes.flatMap(package =>
-    package.versions.nodes.map(version => ({
+  let allPackageVersions = [];
+
+  for (const package of response.repository.packages.nodes) {
+    const packageVersions = (await getAllPackageVersions(package.name)).map(packageVersion => ({
+      ...packageVersion,
       packageName: package.name,
-      versionName: version.version,
-      id: version.id,
-      isPreRelease: checkForPreReleaseRegex.test(version.version)
-    }))
-  );
+      isPreRelease: checkForPreReleaseRegex.test(packageVersion.version)
+    }));
+    allPackageVersions = allPackageVersions.concat(packageVersions);
+  }
+
+  return allPackageVersions;
 }
 
 function filterPackages(packages) {
   const filteredPackages = packages.filter(package => {
-    const versionContainsBranchPattern = package.versionName.indexOf(branchPattern) > -1;
+    const versionContainsBranchPattern = package.version.indexOf(branchPattern) > -1;
     const packageWasRequestedByInput =
       !packageNames.length || packageNames.includes(package.packageName);
     const versionIsPreRelease = package.isPreRelease;
 
     if (!packageWasRequestedByInput) {
       core.info(
-        `Package ${package.versionName} was not in the list of package names from the input parameters.`
+        `Package ${package.version} was not in the list of package names from the input parameters.`
       );
     } else if (!versionIsPreRelease) {
       core.info(
-        `Package ${package.versionName} is not a prerelease package so it will not be deleted.`
+        `Package ${package.version} is not a prerelease package so it will not be deleted.`
       );
     } else if (!versionContainsBranchPattern) {
-      core.info(
-        `Package ${package.versionName} does not meet the pattern and will not be deleted.`
-      );
+      core.info(`Package ${package.version} does not meet the pattern and will not be deleted.`);
     }
 
     return packageWasRequestedByInput && versionIsPreRelease && versionContainsBranchPattern;
@@ -104,7 +165,7 @@ function filterPackages(packages) {
 async function deletePackage(package) {
   try {
     core.info(
-      `\nDeleting package ${package.versionName} (${package.id}) (org: ${org} type: ${packageType})...`
+      `\nDeleting package ${package.version} (${package.id}) (org: ${org} type: ${packageType})...`
     );
 
     const query = `
@@ -117,10 +178,10 @@ async function deletePackage(package) {
 
     await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
 
-    core.info(`Finished deleting package: ${package.versionName} (${package.id}).`);
+    core.info(`Finished deleting package: ${package.version} (${package.id}).`);
   } catch (error) {
     core.warning(
-      `There was an error deleting the package ${package.versionName} (${package.id}): ${error.message}`
+      `There was an error deleting the package ${package.version} (${package.id}): ${error.message}`
     );
   }
 }
