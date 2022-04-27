@@ -15,9 +15,9 @@ inputs:
   package-type:
     description: 'The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.'
     required: true
-  package-name:
-    description: 'The name of the package that versions will be deleted from.'
-    required: true
+  package-names:
+    description: 'The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If not specified, it will default to all of the packages in the current repo.'
+    required: false
 
 runs:
   using: 'node12'

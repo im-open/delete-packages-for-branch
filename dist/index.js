@@ -344,8 +344,8 @@ var require_context = __commonJS({
       }
       get repo() {
         if (process.env.GITHUB_REPOSITORY) {
-          const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
-          return { owner, repo };
+          const [owner, repo2] = process.env.GITHUB_REPOSITORY.split('/');
+          return { owner, repo: repo2 };
         }
         if (this.payload.repository) {
           return {
@@ -13380,7 +13380,7 @@ var require_dist_node6 = __commonJS({
     ];
     var FORBIDDEN_VARIABLE_OPTIONS = ['query', 'method', 'url'];
     var GHES_V3_SUFFIX_REGEX = /\/api\/v3\/?$/;
-    function graphql(request2, query, options) {
+    function graphql2(request2, query, options) {
       if (options) {
         if (typeof query === 'string' && 'query' in options) {
           return Promise.reject(
@@ -13432,7 +13432,7 @@ var require_dist_node6 = __commonJS({
     function withDefaults(request$1, newDefaults) {
       const newRequest = request$1.defaults(newDefaults);
       const newApi = (query, options) => {
-        return graphql(newRequest, query, options);
+        return graphql2(newRequest, query, options);
       };
       return Object.assign(newApi, {
         defaults: withDefaults.bind(null, newRequest),
@@ -13519,7 +13519,7 @@ var require_dist_node8 = __commonJS({
     var universalUserAgent = require_dist_node();
     var beforeAfterHook = require_before_after_hook();
     var request = require_dist_node5();
-    var graphql = require_dist_node6();
+    var graphql2 = require_dist_node6();
     var authToken = require_dist_node7();
     function _objectWithoutPropertiesLoose(source, excluded) {
       if (source == null) return {};
@@ -13580,7 +13580,7 @@ var require_dist_node8 = __commonJS({
           requestDefaults.headers['time-zone'] = options.timeZone;
         }
         this.request = request.request.defaults(requestDefaults);
-        this.graphql = graphql.withCustomRequest(this.request).defaults(requestDefaults);
+        this.graphql = graphql2.withCustomRequest(this.request).defaults(requestDefaults);
         this.log = Object.assign(
           {
             debug: () => {},
@@ -14993,7 +14993,7 @@ var require_dist_node9 = __commonJS({
       }
     };
     var VERSION = '5.13.0';
-    function endpointsToMethods(octokit2, endpointsMap) {
+    function endpointsToMethods(octokit, endpointsMap) {
       const newMethods = {};
       for (const [scope, endpoints] of Object.entries(endpointsMap)) {
         for (const [methodName, endpoint] of Object.entries(endpoints)) {
@@ -15012,7 +15012,7 @@ var require_dist_node9 = __commonJS({
           const scopeMethods = newMethods[scope];
           if (decorations) {
             scopeMethods[methodName] = decorate(
-              octokit2,
+              octokit,
               scope,
               methodName,
               endpointDefaults,
@@ -15020,13 +15020,13 @@ var require_dist_node9 = __commonJS({
             );
             continue;
           }
-          scopeMethods[methodName] = octokit2.request.defaults(endpointDefaults);
+          scopeMethods[methodName] = octokit.request.defaults(endpointDefaults);
         }
       }
       return newMethods;
     }
-    function decorate(octokit2, scope, methodName, defaults, decorations) {
-      const requestWithDefaults = octokit2.request.defaults(defaults);
+    function decorate(octokit, scope, methodName, defaults, decorations) {
+      const requestWithDefaults = octokit.request.defaults(defaults);
       function withDecorations(...args) {
         let options = requestWithDefaults.endpoint.merge(...args);
         if (decorations.mapToData) {
@@ -15038,18 +15038,18 @@ var require_dist_node9 = __commonJS({
         }
         if (decorations.renamed) {
           const [newScope, newMethodName] = decorations.renamed;
-          octokit2.log.warn(
+          octokit.log.warn(
             `octokit.${scope}.${methodName}() has been renamed to octokit.${newScope}.${newMethodName}()`
           );
         }
         if (decorations.deprecated) {
-          octokit2.log.warn(decorations.deprecated);
+          octokit.log.warn(decorations.deprecated);
         }
         if (decorations.renamedParameters) {
           const options2 = requestWithDefaults.endpoint.merge(...args);
           for (const [name, alias] of Object.entries(decorations.renamedParameters)) {
             if (name in options2) {
-              octokit2.log.warn(
+              octokit.log.warn(
                 `"${name}" parameter is deprecated for "octokit.${scope}.${methodName}()". Use "${alias}" instead`
               );
               if (!(alias in options2)) {
@@ -15064,15 +15064,15 @@ var require_dist_node9 = __commonJS({
       }
       return Object.assign(withDecorations, requestWithDefaults);
     }
-    function restEndpointMethods(octokit2) {
-      const api = endpointsToMethods(octokit2, Endpoints);
+    function restEndpointMethods(octokit) {
+      const api = endpointsToMethods(octokit, Endpoints);
       return {
         rest: api
       };
     }
     restEndpointMethods.VERSION = VERSION;
-    function legacyRestEndpointMethods(octokit2) {
-      const api = endpointsToMethods(octokit2, Endpoints);
+    function legacyRestEndpointMethods(octokit) {
+      const api = endpointsToMethods(octokit, Endpoints);
       return _objectSpread2(
         _objectSpread2({}, api),
         {},
@@ -15167,12 +15167,12 @@ var require_dist_node10 = __commonJS({
       response.data.total_count = totalCount;
       return response;
     }
-    function iterator(octokit2, route, parameters) {
+    function iterator(octokit, route, parameters) {
       const options =
         typeof route === 'function'
           ? route.endpoint(parameters)
-          : octokit2.request.endpoint(route, parameters);
-      const requestMethod = typeof route === 'function' ? route : octokit2.request;
+          : octokit.request.endpoint(route, parameters);
+      const requestMethod = typeof route === 'function' ? route : octokit.request;
       const method = options.method;
       const headers = options.headers;
       let url = options.url;
@@ -15210,19 +15210,19 @@ var require_dist_node10 = __commonJS({
         })
       };
     }
-    function paginate(octokit2, route, parameters, mapFn) {
+    function paginate(octokit, route, parameters, mapFn) {
       if (typeof parameters === 'function') {
         mapFn = parameters;
         parameters = void 0;
       }
       return gather(
-        octokit2,
+        octokit,
         [],
-        iterator(octokit2, route, parameters)[Symbol.asyncIterator](),
+        iterator(octokit, route, parameters)[Symbol.asyncIterator](),
         mapFn
       );
     }
-    function gather(octokit2, results, iterator2, mapFn) {
+    function gather(octokit, results, iterator2, mapFn) {
       return iterator2.next().then(result => {
         if (result.done) {
           return results;
@@ -15235,7 +15235,7 @@ var require_dist_node10 = __commonJS({
         if (earlyExit) {
           return results;
         }
-        return gather(octokit2, results, iterator2, mapFn);
+        return gather(octokit, results, iterator2, mapFn);
       });
     }
     var composePaginateRest = Object.assign(paginate, {
@@ -15448,10 +15448,10 @@ var require_dist_node10 = __commonJS({
         return false;
       }
     }
-    function paginateRest(octokit2) {
+    function paginateRest(octokit) {
       return {
-        paginate: Object.assign(paginate.bind(null, octokit2), {
-          iterator: iterator.bind(null, octokit2)
+        paginate: Object.assign(paginate.bind(null, octokit), {
+          iterator: iterator.bind(null, octokit)
         })
       };
     }
@@ -15593,6 +15593,7 @@ var require_github = __commonJS({
 // src/main.js
 var core = require_core();
 var github = require_github();
+var { graphql } = require_dist_node6();
 var requiredArgOptions = {
   required: true,
   trimWhitespace: true
@@ -15600,83 +15601,166 @@ var requiredArgOptions = {
 var token = core.getInput('github-token', requiredArgOptions);
 var branchNameInput = core.getInput('branch-name', requiredArgOptions);
 var packageType = core.getInput('package-type', requiredArgOptions);
-var packageName = core.getInput('package-name', requiredArgOptions);
+var packageNamesInput = core.getInput('package-names');
+var packageNames = !!packageNamesInput
+  ? packageNamesInput.split(',').map(package2 => package2.trim())
+  : [];
+var repo = github.context.repo.repo;
+var checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
 var org = core.getInput('organization');
 if (!org && org.length === 0) {
   org = github.context.repo.owner;
 }
 var branchName = branchNameInput.replace('refs/heads/', '').replace(/[^a-zA-Z0-9-]/g, '-');
 var branchPattern = `-${branchName}.`;
-var octokit = github.getOctokit(token);
-async function getListOfPackages() {
-  let hasMorePackages = true;
-  let packagesToDelete = [];
-  let page = 1;
-  const maxResultsPerPage = 50;
-  core.info(`Gathering list of packages with '${branchPattern}' in the name or tag to delete...`);
-  while (hasMorePackages) {
-    const response = await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
-      org,
-      package_type: packageType,
-      package_name: packageName,
-      per_page: maxResultsPerPage,
-      page
-    });
-    if (response.status == 200) {
-      if (response.data) {
-        if (response.data.length < maxResultsPerPage) {
-          hasMorePackages = false;
-        } else {
-          page += 1;
-        }
-        for (let index = 0; index < response.data.length; index++) {
-          const package2 = response.data[index];
-          if (package2.name.indexOf(branchPattern) > -1) {
-            packagesToDelete.push({
-              name: package2.name,
-              id: package2.id
-            });
-          } else {
-            core.info(`Package ${package2.name} does not meet the pattern and will not be deleted`);
+var graphqlWithAuth = graphql.defaults({
+  headers: {
+    authorization: `token ${token}`
+  }
+});
+async function getAllPackageVersions(packageName) {
+  const initialQuery = `
+  query {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(names: ["${packageName}"], first: 1){
+        totalCount
+        nodes {
+          name
+          id
+          versions(first: 100) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id,
+              version
+            }
           }
         }
-      } else {
-        core.info('Finished getting packages for the repository.');
-      }
-    } else {
-      core.setFailed(`An error occurred retrieving page ${page} of packages.`);
+      } 
     }
   }
-  if (packagesToDelete.length === 0) {
-    core.info('Finished gathering packages, there were no items to removed.');
-  } else {
-    core.info('Finished gathering packages, the following items will be removed:');
-    console.log(packagesToDelete);
+  `;
+  const paginatedQuery = `
+  query getPackageVersions($cursor: String!) {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(names: ["${packageName}"], first: 1){
+        totalCount
+        nodes {
+          name
+          id
+          versions(first: 100, after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id,
+              version
+            }
+          }
+        }
+      } 
+    }
   }
-  return packagesToDelete;
+  `;
+  let packageVersions = [];
+  let hasNextPage = true;
+  let currentCursor = '';
+  while (hasNextPage) {
+    const response =
+      currentCursor === ''
+        ? await graphqlWithAuth(initialQuery)
+        : await graphqlWithAuth(paginatedQuery, { cursor: currentCursor });
+    const pageVersions = response.repository.packages.nodes[0].versions;
+    hasNextPage = pageVersions.pageInfo.hasNextPage;
+    currentCursor = pageVersions.pageInfo.endCursor;
+    packageVersions = packageVersions.concat(pageVersions.nodes);
+  }
+  return packageVersions;
+}
+async function getAllPackagesForRepo() {
+  core.info('Querying for all of the packages in the repo.\n');
+  const query = `
+  query {
+    repository(owner: "${org}", name: "${repo}") {
+      packages(packageType: ${packageType.toUpperCase()}, first: 100){
+        totalCount
+        nodes {
+          name
+          id
+        }
+      } 
+    }
+  }
+  `;
+  const response = await graphqlWithAuth(query);
+  core.info(`Successfully recieved ${response.repository.packages.totalCount} packages.`);
+  response.repository.packages.nodes.forEach(node => {
+    core.info(node.name);
+  });
+  core.info(' ');
+  let allPackageVersions = [];
+  for (const package2 of response.repository.packages.nodes) {
+    const packageVersions = (await getAllPackageVersions(package2.name)).map(packageVersion => ({
+      ...packageVersion,
+      packageName: package2.name,
+      isPreRelease: checkForPreReleaseRegex.test(packageVersion.version)
+    }));
+    allPackageVersions = allPackageVersions.concat(packageVersions);
+  }
+  return allPackageVersions;
+}
+function filterPackages(packages) {
+  const filteredPackages = packages.filter(package2 => {
+    const versionContainsBranchPattern = package2.version.indexOf(branchPattern) > -1;
+    const packageWasRequestedByInput =
+      !packageNames.length || packageNames.includes(package2.packageName);
+    const versionIsPreRelease = package2.isPreRelease;
+    if (!packageWasRequestedByInput) {
+      core.info(
+        `Package ${package2.version} was not in the list of package names from the input parameters.`
+      );
+    } else if (!versionIsPreRelease) {
+      core.info(
+        `Package ${package2.version} is not a prerelease package so it will not be deleted.`
+      );
+    } else if (!versionContainsBranchPattern) {
+      core.info(`Package ${package2.version} does not meet the pattern and will not be deleted.`);
+    }
+    return packageWasRequestedByInput && versionIsPreRelease && versionContainsBranchPattern;
+  });
+  core.info('Finished gathering packages, the following items will be removed:');
+  console.log(filteredPackages);
+  return filteredPackages;
 }
 async function deletePackage(package2) {
   try {
     core.info(`
-Deleting package ${package2.name} (${package2.id})...`);
-    await octokit.rest.packages.deletePackageVersionForOrg({
-      package_type: packageType,
-      package_name: packageName,
-      org,
-      package_version_id: package2.id
-    });
-    core.info(`Finished deleting package: ${package2.name} (${package2.id}).`);
+Deleting package ${package2.version} (${package2.id}) (org: ${org} type: ${packageType})...`);
+    const query = `
+    mutation {
+      deletePackageVersion(input: {packageVersionId: "${package2.id}"}) {
+        success
+      }
+    }
+    `;
+    await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
+    core.info(`Finished deleting package: ${package2.version} (${package2.id}).`);
   } catch (error) {
     core.warning(
-      `There was an error deleting the package ${package2.name} (${package2.id}): ${error.message}`
+      `There was an error deleting the package ${package2.version} (${package2.id}): ${error.message}`
     );
   }
 }
 async function run() {
-  let packagesToDelete = await getListOfPackages();
-  for (let index = 0; index < packagesToDelete.length; index++) {
-    await deletePackage(packagesToDelete[index]);
+  const packagesInRepo = await getAllPackagesForRepo();
+  const packagesToDelete = filterPackages(packagesInRepo);
+  for (const package2 of packagesToDelete) {
+    await deletePackage(package2);
   }
+  core.info('\nFinished deleting packages.');
 }
 run();
 /*!
