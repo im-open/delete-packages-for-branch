@@ -40,7 +40,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v1.0.2
+        uses: im-open/delete-branch-package-versions@v1.0.4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'myOrg'
