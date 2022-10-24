@@ -7,194 +7,131 @@ const requiredArgOptions = {
   trimWhitespace: true
 };
 
-const token = core.getInput('github-token', requiredArgOptions);
-const branchNameInput = core.getInput('branch-name', requiredArgOptions);
-const packageType = core.getInput('package-type', requiredArgOptions);
-const packageNamesInput = core.getInput('package-names');
-const packageNames = !!packageNamesInput
-  ? packageNamesInput.split(',').map(package => package.trim())
-  : [];
-const repo = github.context.repo.repo;
-const checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
-
 let org = core.getInput('organization');
 if (!org && org.length === 0) {
   org = github.context.repo.owner;
 }
+let repo = core.getInput('repository');
+if (!repo && repo.length === 0) {
+  repo = github.context.repo.repo;
+}
 
+const packageType = core.getInput('package-type', requiredArgOptions);
+const packageNamesInput = core.getInput('package-names');
+const packagesWithVersionsToDelete = !!packageNamesInput ? packageNamesInput.split(',').map(package => package.trim()) : [];
+
+const branchNameInput = core.getInput('branch-name', requiredArgOptions);
 const branchName = branchNameInput.replace('refs/heads/', '').replace(/[^a-zA-Z0-9-]/g, '-');
 const branchPattern = `-${branchName}.`;
+const checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
+
+const token = core.getInput('github-token', requiredArgOptions);
+const octokit = github.getOctokit(token);
 const graphqlWithAuth = graphql.defaults({
   headers: {
     authorization: `token ${token}`
   }
 });
 
-async function getAllPackageVersions(packageName) {
-  const initialQuery = `
-  query {
-    repository(owner: "${org}", name: "${repo}") {
-      packages(names: ["${packageName}"], first: 1){
-        totalCount
-        nodes {
-          name
-          id
-          versions(first: 100) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              id,
-              version
-            }
-          }
-        }
-      } 
-    }
-  }
-  `;
-  const paginatedQuery = `
-  query getPackageVersions($cursor: String!) {
-    repository(owner: "${org}", name: "${repo}") {
-      packages(names: ["${packageName}"], first: 1){
-        totalCount
-        nodes {
-          name
-          id
-          versions(first: 100, after: $cursor) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              id,
-              version
-            }
-          }
-        }
-      } 
-    }
-  }
-  `;
-  let packageVersions = [];
-  let hasNextPage = true;
-  let currentCursor = '';
-
-  while (hasNextPage) {
-    const response =
-      currentCursor === ''
-        ? await graphqlWithAuth(initialQuery)
-        : await graphqlWithAuth(paginatedQuery, { cursor: currentCursor });
-    const pageVersions = response.repository.packages.nodes[0].versions;
-    hasNextPage = pageVersions.pageInfo.hasNextPage;
-    currentCursor = pageVersions.pageInfo.endCursor;
-
-    packageVersions = packageVersions.concat(pageVersions.nodes);
+async function deletePackageVersions(org, packageName, packageType, pkgVersionsToDelete) {
+  if (pkgVersionsToDelete.length <= 0) {
+    core.info(`\nThere are no ${packageName} package versions to delete for branch '${branchName}'`);
+    return;
   }
 
-  return packageVersions;
+  core.info(`\nBegin Deleting ${packageName} package versions for branch '${branchName}'`);
+  for (const pkgVersion of pkgVersionsToDelete) {
+    core.info(`\t${pkgVersion.version}, id: '${pkgVersion.id}' - Starting Delete.`);
+
+    await octokit.rest.packages
+      .deletePackageVersionForOrg({
+        package_type: packageType,
+        package_name: packageName,
+        org: org,
+        package_version_id: pkgVersion.id
+      })
+      .then(() => {
+        core.info(`\t${pkgVersion.version}, id: '${pkgVersion.id}' - Deleted.\n`);
+      })
+      .catch(error => {
+        core.warning(`\t${pkgVersion.version}, id: '${pkgVersion.id}' - Error: ${error.message}.\n`);
+      });
+  }
 }
 
-async function getAllPackagesForRepo() {
-  core.info('Querying for all of the packages in the repo.\n');
-  const query = `
-  query {
-    repository(owner: "${org}", name: "${repo}") {
-      packages(packageType: ${packageType.toUpperCase()}, first: 100){
-        totalCount
-        nodes {
-          name
-          id
-        }
-      } 
-    }
-  }
-  `;
+async function getVersionsToDeleteForPackage(org, packageName, packageType) {
+  let rawVersions = [];
+  await octokit
+    // The octokit version of the api call (octokit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg)
+    // doesn't seem to be working currently.  So using a custom request until it is fixed.
+    .paginate(`GET /orgs/{owner}/packages/{packageType}/{packageName}/versions`, {
+      owner: org,
+      packageType: packageType,
+      packageName: packageName
+    })
+    .then(packageVersions => {
+      rawVersions = packageVersions.map(pv => {
+        return {
+          version: pv.name,
+          id: pv.id
+        };
+      });
+    })
+    .catch(error => {
+      core.info(`An error occurred retrieving ${packageName} package versions: ${error.message}`);
+    });
 
-  const response = await graphqlWithAuth(query);
-  core.info(`Successfully recieved ${response.repository.packages.totalCount} packages.`);
-  response.repository.packages.nodes.forEach(node => {
-    core.info(node.name);
-  });
-  // Add some space between the list of packages and the following logs.
-  core.info(' ');
-
-  let allPackageVersions = [];
-
-  for (const package of response.repository.packages.nodes) {
-    const packageVersions = (await getAllPackageVersions(package.name)).map(packageVersion => ({
-      ...packageVersion,
-      packageName: package.name,
-      isPreRelease: checkForPreReleaseRegex.test(packageVersion.version)
-    }));
-    allPackageVersions = allPackageVersions.concat(packageVersions);
-  }
-
-  return allPackageVersions;
+  return rawVersions
+    .sort((a, b) => (a.version > b.version ? 1 : b.version > a.version ? -1 : 0))
+    .filter(v => checkForPreReleaseRegex.test(v.version) && v.version.indexOf(branchPattern) > -1);
 }
 
-function filterPackages(packages) {
-  const filteredPackages = packages.filter(package => {
-    const versionContainsBranchPattern = package.version.indexOf(branchPattern) > -1;
-    const packageWasRequestedByInput =
-      !packageNames.length || packageNames.includes(package.packageName);
-    const versionIsPreRelease = package.isPreRelease;
-
-    if (!packageWasRequestedByInput) {
-      core.info(
-        `Package ${package.version} was not in the list of package names from the input parameters.`
-      );
-    } else if (!versionIsPreRelease) {
-      core.info(
-        `Package ${package.version} is not a prerelease package so it will not be deleted.`
-      );
-    } else if (!versionContainsBranchPattern) {
-      core.info(`Package ${package.version} does not meet the pattern and will not be deleted.`);
-    }
-
-    return packageWasRequestedByInput && versionIsPreRelease && versionContainsBranchPattern;
-  });
-
-  core.info('Finished gathering packages, the following items will be removed:');
-  console.log(filteredPackages); //Normally I'd make this core.info but it doesn't print right with JSON.stringify()
-
-  return filteredPackages;
-}
-
-async function deletePackage(package) {
-  try {
+async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVersionsToDelete) {
+  //If nothing was sent in for this arg, default to gathering info for all packages.
+  if (packagesWithVersionsToDelete.length !== 0) {
     core.info(
-      `\nDeleting package ${package.version} (${package.id}) (org: ${org} type: ${packageType})...`
+      `\nThe action was provided with package names and will look for versions to delete in the following packages:`
     );
+    packagesWithVersionsToDelete.forEach(p => core.info(`\t${p}`));
+    return packagesWithVersionsToDelete;
+  } else {
+    core.info('Querying for all of the packages in the repo.\n');
 
     const query = `
-    mutation {
-      deletePackageVersion(input: {packageVersionId: "${package.id}"}) {
-        success
+    query {
+      repository(owner: "${org}", name: "${repo}") {
+        packages(packageType: ${packageType.toUpperCase()}, first: 100){
+          nodes {
+            name
+          }
+        } 
       }
-    }
-    `;
+    }`;
 
-    await graphqlWithAuth(query, { mediaType: { previews: ['package-deletes'] } });
+    const response = await graphqlWithAuth(query);
+    core.info(`Successfully retrieved ${response.repository.packages.nodes.length} packages.`);
 
-    core.info(`Finished deleting package: ${package.version} (${package.id}).`);
-  } catch (error) {
-    core.warning(
-      `There was an error deleting the package ${package.version} (${package.id}): ${error.message}`
-    );
+    response.repository.packages.nodes.forEach(p => {
+      packagesWithVersionsToDelete.push(p.name);
+    });
+
+    core.info(`\nThe action will look for versions to delete in the following packages:`);
+    packagesWithVersionsToDelete.forEach(p => core.info(`\t${p}`));
+    return packagesWithVersionsToDelete;
   }
 }
 
 async function run() {
-  const packagesInRepo = await getAllPackagesForRepo();
-  const packagesToDelete = filterPackages(packagesInRepo);
+  core.info(`Begin deleting '${branchName}' package versions for ${org}/${repo}...`);
 
-  for (const package of packagesToDelete) {
-    await deletePackage(package);
+  const packagesToReview = await getPackagesInRepoToReview(org, repo, packageType, packagesWithVersionsToDelete);
+
+  for (const pkgName of packagesToReview) {
+    const pkgVersionsToDelete = await getVersionsToDeleteForPackage(org, pkgName, packageType);
+    await deletePackageVersions(org, pkgName, packageType, pkgVersionsToDelete);
   }
 
-  core.info('\nFinished deleting packages.');
+  core.info(`\nFinished deleting '${branchName}' package versions from ${org}/${repo}.`);
 }
 
 run();
