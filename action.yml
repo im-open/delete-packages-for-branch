@@ -9,6 +9,9 @@ inputs:
   organization:
     description: 'The organization the packages were created in.  Defaults to github.context.repo.org if not provided.'
     required: false
+  repository:
+    description: 'The repo the packages were created in.  Defaults to github.context.repo.repo if not provided.'
+    required: false
   branch-name:
     description: 'The branch name the packages were created with.  This is how package versions to delete are identified.'
     required: true
