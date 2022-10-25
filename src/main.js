@@ -43,6 +43,7 @@ async function deletePackageVersions(org, packageName, packageType, pkgVersionsT
   for (const pkgVersion of pkgVersionsToDelete) {
     core.info(`\t${pkgVersion.version}, id: '${pkgVersion.id}' - Starting Delete.`);
 
+    // Using the rest api provides the most reliable results for deleting the packages.
     await octokit.rest.packages
       .deletePackageVersionForOrg({
         package_type: packageType,
@@ -108,6 +109,9 @@ async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVer
       }
     }`;
 
+    // The rest api does not provide a good way to gather the packages that are
+    // associated with a single repository.  You can only get them based on the
+    // org or user.  Those results don't include the repo, so use graph api here.
     const response = await graphqlWithAuth(query);
     core.info(`Successfully retrieved ${response.repository.packages.nodes.length} packages.`);
 
