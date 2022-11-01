@@ -84,7 +84,7 @@ async function getVersionsToDeleteForPackage(org, packageName, packageType) {
 
   return rawVersions
     .sort((a, b) => (a.version > b.version ? 1 : b.version > a.version ? -1 : 0))
-    .filter(v => checkForPreReleaseRegex.test(v.version) && v.version.indexOf(branchPattern) > -1);
+    .filter(v => checkForPreReleaseRegex.test(v.version) && v.version.includes(branchPattern));
 }
 
 async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVersionsToDelete) {
