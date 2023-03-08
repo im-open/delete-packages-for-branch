@@ -1,6 +1,5 @@
-name: 'delete-branch-package-versions'
-
-description: 'An action to delete pre-release GH Package versions created for a specified branch'
+name: delete-branch-package-versions
+description: An action to delete pre-release GH Package versions created for a specified branch
 
 inputs:
   github-token:
