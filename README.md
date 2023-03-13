@@ -44,7 +44,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v2.2.2
+        uses: im-open/delete-branch-package-versions@v2.2.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -63,7 +63,8 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v2.2.2
+        # You may also reference just the major or major.minor version
+        uses: im-open/delete-branch-package-versions@v2.2.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -82,7 +83,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v2.2.2
+        uses: im-open/delete-branch-package-versions@v2.2.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'mySpecifiedOrg'
