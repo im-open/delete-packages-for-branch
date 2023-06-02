@@ -20,13 +20,15 @@ If the action runs into an issue deleting a specific package version, it will ge
   
 ## Inputs
 | Parameter       | Is Required | Description                                                                                                                                                                                                   |
-| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|-----------------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `github-token`  | true        | An access token with the `packages:delete` and `packages:read` scopes that is authorized in the organization where the package versions to be deleted are.                                                    |
 | `organization`  | false       | The organization the packages were created in.  Defaults to `github.context.repo.org` if not provided.                                                                                                        |
-| `repository`    | false       | The repository the packages are in.  Defaults to `github.context.repo.repo` if not provided.                                                                                                        |
+| `repository`    | false       | The repository the packages are in.  Defaults to `github.context.repo.repo` if not provided.                                                                                                                  |
 | `branch-name`   | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                                                                       |
 | `package-type`  | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                                                                          |
-| `package-names` | false       | The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If ommitted, it will default to all of the packages in the current repo. |
+| `package-names` | false**     | The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If ommitted, it will default to all of the packages in the current repo. |
+
+** *Note: When using versions prior to 3.0.0, `package-names` must be provided if the `package-type` is not `debian` or `pypi`.  GitHub officially dropped support for querying `npm`, `rubygems`, `maven`, `docker` and `nuget` packages associated with a repo through the GraphAPI on June 01, 2023, which previous versions of the action used.  Version 3.0.0 and later use the REST API to find packages associated with a repo when the `package-names` input is not provided.*
 
 ## Outputs
 No Outputs
@@ -44,7 +46,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v2.2.3
+        uses: im-open/delete-branch-package-versions@v3.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -64,7 +66,7 @@ jobs:
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
         # You may also reference just the major or major.minor version
-        uses: im-open/delete-branch-package-versions@v2.2.3
+        uses: im-open/delete-branch-package-versions@v3.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -83,7 +85,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v2.2.3
+        uses: im-open/delete-branch-package-versions@v3.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'mySpecifiedOrg'
@@ -130,7 +132,7 @@ Both the build and PR merge workflows will use the strategies below to determine
 
 This action uses [git-version-lite] to examine commit messages to determine whether to perform a major, minor or patch increment on merge.  The following table provides the fragment that should be included in a commit message to active different increment strategies.
 | Increment Type | Commit Message Fragment                     |
-| -------------- | ------------------------------------------- |
+|----------------|---------------------------------------------|
 | major          | +semver:breaking                            |
 | major          | +semver:major                               |
 | minor          | +semver:feature                             |

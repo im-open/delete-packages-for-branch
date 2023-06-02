@@ -14469,7 +14469,7 @@ var require_dist_node6 = __commonJS({
     var NON_VARIABLE_OPTIONS = ['method', 'baseUrl', 'url', 'headers', 'request', 'query', 'mediaType'];
     var FORBIDDEN_VARIABLE_OPTIONS = ['query', 'method', 'url'];
     var GHES_V3_SUFFIX_REGEX = /\/api\/v3\/?$/;
-    function graphql2(request2, query, options) {
+    function graphql(request2, query, options) {
       if (options) {
         if (typeof query === 'string' && 'query' in options) {
           return Promise.reject(new Error(`[@octokit/graphql] "query" cannot be used as variable name`));
@@ -14517,7 +14517,7 @@ var require_dist_node6 = __commonJS({
     function withDefaults(request$1, newDefaults) {
       const newRequest = request$1.defaults(newDefaults);
       const newApi = (query, options) => {
-        return graphql2(newRequest, query, options);
+        return graphql(newRequest, query, options);
       };
       return Object.assign(newApi, {
         defaults: withDefaults.bind(null, newRequest),
@@ -14597,7 +14597,7 @@ var require_dist_node8 = __commonJS({
     var universalUserAgent = require_dist_node();
     var beforeAfterHook = require_before_after_hook();
     var request = require_dist_node5();
-    var graphql2 = require_dist_node6();
+    var graphql = require_dist_node6();
     var authToken = require_dist_node7();
     function _objectWithoutPropertiesLoose(source, excluded) {
       if (source == null) return {};
@@ -14658,7 +14658,7 @@ var require_dist_node8 = __commonJS({
           requestDefaults.headers['time-zone'] = options.timeZone;
         }
         this.request = request.request.defaults(requestDefaults);
-        this.graphql = graphql2.withCustomRequest(this.request).defaults(requestDefaults);
+        this.graphql = graphql.withCustomRequest(this.request).defaults(requestDefaults);
         this.log = Object.assign(
           {
             debug: () => {},
@@ -16489,7 +16489,6 @@ var require_github = __commonJS({
 // src/main.js
 var core = require_core();
 var github = require_github();
-var { graphql } = require_dist_node6();
 var requiredArgOptions = {
   required: true,
   trimWhitespace: true
@@ -16511,11 +16510,6 @@ var branchPattern = `-${branchName}.`;
 var checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
 var token = core.getInput('github-token', requiredArgOptions);
 var octokit = github.getOctokit(token);
-var graphqlWithAuth = graphql.defaults({
-  headers: {
-    authorization: `token ${token}`
-  }
-});
 async function deletePackageVersions(org2, packageName, packageType2, pkgVersionsToDelete) {
   if (pkgVersionsToDelete.length <= 0) {
     core.info(`
@@ -16574,24 +16568,26 @@ The action was provided with package names and will look for versions to delete 
     return packagesWithVersionsToDelete2;
   } else {
     core.info('Querying for all of the packages in the repo.\n');
-    const query = `
-    query {
-      repository(owner: "${org2}", name: "${repo2}") {
-        packages(packageType: ${packageType2.toUpperCase()}, first: 100){
-          nodes {
-            name
-          }
-        } 
-      }
-    }`;
-    const response = await graphqlWithAuth(query);
-    core.info(`Successfully retrieved ${response.repository.packages.nodes.length} packages.`);
-    response.repository.packages.nodes.forEach(p => {
-      packagesWithVersionsToDelete2.push(p.name);
-    });
-    core.info(`
-The action will look for versions to delete in the following packages:`);
-    packagesWithVersionsToDelete2.forEach(p => core.info(`	${p}`));
+    await octokit
+      .paginate(octokit.rest.packages.listPackagesForOrganization, { package_type: packageType2, org: org2 })
+      .then(packages => {
+        const repoPackages =
+          packages && packages.length > 0
+            ? packages.filter(p => p.repository.name.toLowerCase() === repo2.toLowerCase())
+            : [];
+        if (repoPackages) {
+          packagesWithVersionsToDelete2 = repoPackages.map(p => p.name);
+          core.info(`
+The action will look for versions to delete in the following packages:
+	${packagesWithVersionsToDelete2.join('\n	')}`);
+        } else {
+          packagesWithVersionsToDelete2 = [];
+          core.info(`No packages were found for the ${repo2} repository.`);
+        }
+      })
+      .catch(error => {
+        core.error(`An error occurred retrieving packages for ${repo2}: ${error.message}`);
+      });
     return packagesWithVersionsToDelete2;
   }
 }
