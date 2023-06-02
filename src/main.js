@@ -1,6 +1,5 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
-const { graphql } = require('@octokit/graphql');
 
 const requiredArgOptions = {
   required: true,
@@ -27,11 +26,6 @@ const checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
 
 const token = core.getInput('github-token', requiredArgOptions);
 const octokit = github.getOctokit(token);
-const graphqlWithAuth = graphql.defaults({
-  headers: {
-    authorization: `token ${token}`
-  }
-});
 
 async function deletePackageVersions(org, packageName, packageType, pkgVersionsToDelete) {
   if (pkgVersionsToDelete.length <= 0) {
@@ -98,29 +92,30 @@ async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVer
   } else {
     core.info('Querying for all of the packages in the repo.\n');
 
-    const query = `
-    query {
-      repository(owner: "${org}", name: "${repo}") {
-        packages(packageType: ${packageType.toUpperCase()}, first: 100){
-          nodes {
-            name
-          }
-        } 
-      }
-    }`;
+    await octokit
+      .paginate(octokit.rest.packages.listPackagesForOrganization, { package_type: packageType, org: org })
+      .then(packages => {
+        const repoPackages =
+          packages && packages.length > 0
+            ? packages.filter(p => p.repository.name.toLowerCase() === repo.toLowerCase())
+            : [];
 
-    // The rest api does not provide a good way to gather the packages that are
-    // associated with a single repository.  You can only get them based on the
-    // org or user.  Those results don't include the repo, so use graph api here.
-    const response = await graphqlWithAuth(query);
-    core.info(`Successfully retrieved ${response.repository.packages.nodes.length} packages.`);
+        if (repoPackages) {
+          packagesWithVersionsToDelete = repoPackages.map(p => p.name);
+          core.info(
+            `\nThe action will look for versions to delete in the following packages:\n\t${packagesWithVersionsToDelete.join(
+              '\n\t'
+            )}`
+          );
+        } else {
+          packagesWithVersionsToDelete = [];
+          core.info(`No packages were found for the ${repo} repository.`);
+        }
+      })
+      .catch(error => {
+        core.error(`An error occurred retrieving packages for ${repo}: ${error.message}`);
+      });
 
-    response.repository.packages.nodes.forEach(p => {
-      packagesWithVersionsToDelete.push(p.name);
-    });
-
-    core.info(`\nThe action will look for versions to delete in the following packages:`);
-    packagesWithVersionsToDelete.forEach(p => core.info(`\t${p}`));
     return packagesWithVersionsToDelete;
   }
 }
