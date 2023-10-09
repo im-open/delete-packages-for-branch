@@ -30,6 +30,7 @@ If the action runs into an issue deleting a specific package version, it will ge
 | `branch-name`   | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                                                                      |
 | `package-type`  | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                                                                         |
 | `package-names` | false**     | The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If omitted, it will default to all of the packages in the current repo. |
+| `strict-match-mode` | false       | Flag that determines the pattern the action will use to identify matches in the release name and tag.  Defaults to `true`.<br/>• `true: -<sanitized-branch-name>.` Releases created with [git-version-lite] tags follow this pattern.<br/>• `false: <sanitized-branch-name>` |
 
 ** *Note: When using versions prior to 3.0.0, `package-names` must be provided if the `package-type` is not `debian` or `pypi`.  GitHub officially dropped support for querying `npm`, `rubygems`, `maven`, `docker` and `nuget` packages associated with a repo through the GraphAPI on June 01, 2023, which previous versions of the action used.  Version 3.0.0 and later use the REST API to find packages associated with a repo when the `package-names` input is not provided.*
 
@@ -51,7 +52,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -72,7 +73,7 @@ jobs:
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
         # You may also reference just the major or major.minor version
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -92,7 +93,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'mySpecifiedOrg'

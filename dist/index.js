@@ -16493,20 +16493,18 @@ var requiredArgOptions = {
   required: true,
   trimWhitespace: true
 };
-var org = core.getInput('organization');
-if (!org && org.length === 0) {
-  org = github.context.repo.owner;
-}
-var repo = core.getInput('repository');
-if (!repo && repo.length === 0) {
-  repo = github.context.repo.repo;
-}
+var trimOptions = {
+  trimWhitespace: true
+};
+var org = core.getInput('organization', trimOptions) || github.context.repo.owner;
+var repo = core.getInput('repository', trimOptions) || github.context.repo.repo;
 var packageType = core.getInput('package-type', requiredArgOptions);
-var packageNamesInput = core.getInput('package-names');
-var packagesWithVersionsToDelete = !!packageNamesInput ? packageNamesInput.split(',').map(package2 => package2.trim()) : [];
+var packageNamesInput = core.getInput('package-names', trimOptions);
+var strictMatchMode = core.getBooleanInput('strict-match-mode', requiredArgOptions);
 var branchNameInput = core.getInput('branch-name', requiredArgOptions);
+var packagesWithVersionsToDelete = !!packageNamesInput ? packageNamesInput.split(',').map(package2 => package2.trim()) : [];
 var branchName = branchNameInput.replace('refs/heads/', '').replace(/[^a-zA-Z0-9-]/g, '-');
-var branchPattern = `-${branchName}.`;
+var branchPattern = strictMatchMode ? `-${branchName}.` : branchName;
 var checkForPreReleaseRegex = /^.*\d+\.\d+\.\d+-.+$/;
 var token = core.getInput('github-token', requiredArgOptions);
 var octokit = github.getOctokit(token);
@@ -16562,37 +16560,46 @@ async function getVersionsToDeleteForPackage(org2, packageName, packageType2) {
 }
 async function getPackagesInRepoToReview(org2, repo2, packageType2, packagesWithVersionsToDelete2) {
   if (packagesWithVersionsToDelete2.length !== 0) {
-    core.info(`
-The action was provided with package names and will look for versions to delete in the following packages:`);
-    packagesWithVersionsToDelete2.forEach(p => core.info(`	${p}`));
-    return packagesWithVersionsToDelete2;
-  } else {
-    core.info('Querying for all of the packages in the repo.\n');
-    await octokit
-      .paginate(octokit.rest.packages.listPackagesForOrganization, { package_type: packageType2, org: org2 })
-      .then(packages => {
-        const repoPackages =
-          packages && packages.length > 0
-            ? packages.filter(p => p.repository.name.toLowerCase() === repo2.toLowerCase())
-            : [];
-        if (repoPackages) {
-          packagesWithVersionsToDelete2 = repoPackages.map(p => p.name);
-          core.info(`
-The action will look for versions to delete in the following packages:
-	${packagesWithVersionsToDelete2.join('\n	')}`);
-        } else {
-          packagesWithVersionsToDelete2 = [];
-          core.info(`No packages were found for the ${repo2} repository.`);
-        }
-      })
-      .catch(error => {
-        core.error(`An error occurred retrieving packages for ${repo2}: ${error.message}`);
-      });
+    const packageString = packagesWithVersionsToDelete2.join('\n	$');
+    const message = `
+The action was provided with package names and will look for versions to delete in the following packages:
+	${packageString}`;
+    core.info(message);
     return packagesWithVersionsToDelete2;
   }
+  const orgAndRepo = `${org2}/${repo2}`;
+  core.info('Querying for all of the packages in the repo.\n');
+  await octokit
+    .paginate(octokit.rest.packages.listPackagesForOrganization, { package_type: packageType2, org: org2 })
+    .then(packages => {
+      let repoPackages = [];
+      if (packages && packages.length > 0) {
+        repoPackages = packages.filter(p => p.repository.name.toLowerCase() === repo2.toLowerCase());
+      }
+      if (repoPackages && repoPackages.length > 0) {
+        packagesWithVersionsToDelete2 = repoPackages.map(p => p.name);
+        const packageString = packagesWithVersionsToDelete2.join('\n	$');
+        core.info(`
+The action will look for versions to delete in the following packages:
+	${packageString}`);
+      } else {
+        packagesWithVersionsToDelete2 = [];
+        core.info(`No packages were found in the ${orgAndRepo} repository.`);
+      }
+    })
+    .catch(error => {
+      core.setFailed(`An error occurred retrieving packages in ${orgAndRepo}: ${error.message}`);
+    });
+  return packagesWithVersionsToDelete2;
 }
 async function run() {
-  core.info(`Begin deleting '${branchName}' package versions for ${org}/${repo}...`);
+  core.info(`Begin deleting package versions...`);
+  core.info(`Repo: ${org}/${repo}`);
+  core.info('Package Names: ${packagesWithVersionsToDelete.join(', ')}');
+  core.info(`Strict match mode: ${strictMatchMode}`);
+  core.info(`Branch name input: '${branchNameInput}'`);
+  core.info(`Sanitized Branch name: '${branchName}'`);
+  core.info(`Pattern to match: '${branchPattern}'`);
   const packagesToReview = await getPackagesInRepoToReview(org, repo, packageType, packagesWithVersionsToDelete);
   for (const pkgName of packagesToReview) {
     const pkgVersionsToDelete = await getVersionsToDeleteForPackage(org, pkgName, packageType);
