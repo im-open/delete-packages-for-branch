@@ -78,14 +78,15 @@ jobs:
       BRANCH_B_TAG_2: ''
 
     steps:
-      - uses: actions/checkout@v3
-
       #--------------------------------------
       # SETUP
       #--------------------------------------
       - name: '-------------------------------------------------------------------------------------------------------'
         run: echo ""
 
+      - name: Setup - Checkout the action
+        uses: actions/checkout@v3
+      
       - name: Setup - Create Dynamic Tags
         run: |
           tag=$(date +'%Y%m%d%H%M%S')
