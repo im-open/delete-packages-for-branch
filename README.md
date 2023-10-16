@@ -17,6 +17,7 @@ If the action runs into an issue deleting a specific package version, it will ge
     - [Source Code Changes](#source-code-changes)
     - [Recompiling Manually](#recompiling-manually)
     - [Updating the README.md](#updating-the-readmemd)
+    - [Tests](#tests)
   - [Code of Conduct](#code-of-conduct)
   - [License](#license)
   
@@ -30,6 +31,7 @@ If the action runs into an issue deleting a specific package version, it will ge
 | `branch-name`   | true        | The branch name the packages were created with.  This is how package versions to delete are identified.                                                                                                      |
 | `package-type`  | true        | The type of package where versions will be deleted.  Can be one of npm, maven, rubygems, nuget, docker or container.                                                                                         |
 | `package-names` | false**     | The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If omitted, it will default to all of the packages in the current repo. |
+| `strict-match-mode` | false       | Flag that determines the pattern the action will use to identify matches in the release name and tag.  Defaults to `true`.<br/>• `true: -<sanitized-branch-name>.` Releases created with [git-version-lite] tags follow this pattern.<br/>• `false: <sanitized-branch-name>` |
 
 ** *Note: When using versions prior to 3.0.0, `package-names` must be provided if the `package-type` is not `debian` or `pypi`.  GitHub officially dropped support for querying `npm`, `rubygems`, `maven`, `docker` and `nuget` packages associated with a repo through the GraphAPI on June 01, 2023, which previous versions of the action used.  Version 3.0.0 and later use the REST API to find packages associated with a repo when the `package-names` input is not provided.*
 
@@ -51,7 +53,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -72,7 +74,7 @@ jobs:
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
         # You may also reference just the major or major.minor version
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name: ${{ github.head_ref }}
@@ -92,7 +94,7 @@ jobs:
     
     steps:
       - name: Clean up the GitHub package versions that were created for this branch
-        uses: im-open/delete-branch-package-versions@v3.0.0
+        uses: im-open/delete-branch-package-versions@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: 'mySpecifiedOrg'
@@ -109,6 +111,7 @@ When creating PRs, please review the following guidelines:
 - [ ] At least one of the commit messages contains the appropriate `+semver:` keywords listed under [Incrementing the Version] for major and minor increments.
 - [ ] The action has been recompiled.  See [Recompiling Manually] for details.
 - [ ] The README.md has been updated with the latest version of the action.  See [Updating the README.md] for details.
+- [ ] Any tests in the [build-and-review-pr] workflow are passing
 
 ### Incrementing the Version
 
@@ -142,6 +145,12 @@ npm run build
 ### Updating the README.md
 
 If changes are made to the action's [source code], the [usage examples] section of this file should be updated with the next version of the action.  Each instance of this action should be updated.  This helps users know what the latest tag is without having to navigate to the Tags page of the repository.  See [Incrementing the Version] for details on how to determine what the next version will be or consult the first workflow run for the PR which will also calculate the next version.
+
+### Tests
+
+The [build-and-review-pr] workflow includes tests which are linked to a status check. That status check needs to succeed before a PR is merged to the default branch.  When a PR comes from a branch, the workflow has access to secrets which are required to run the tests successfully.  
+
+When a PR comes from a fork, the workflow cannot access any secrets, so the tests won't have the necessary permissions to run. When a PR comes from a fork, the changes should be reviewed, then merged into an intermediate branch by repository owners so tests can be run against the PR changes.  Once the tests have passed, changes can be merged into the default branch.
 
 ## Code of Conduct
 

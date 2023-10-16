@@ -60,3 +60,207 @@ jobs:
       # The npm script to run to build the action.  This is typically 'npm run build' if the
       # action needs to be compiled.  For composite-run-steps actions this is typically empty.
       build-command: 'npm run build'
+
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      ORG: 'im-open'
+      REPO: 'delete-branch-package-versions'
+      PACKAGE_NAME: 'npm-pkg-to-delete'
+      PROD_TAG: '1.0.0'
+      BRANCH_A: 'branch-a'
+      BRANCH_A_TAG_1: ''
+      BRANCH_A_TAG_2: ''
+      BRANCH_A_TAG_3: ''
+      BRANCH_B: 'branch-b'
+      BRANCH_B_TAG_1: ''
+      BRANCH_B_TAG_2: ''
+
+    steps:
+      #--------------------------------------
+      # SETUP
+      #--------------------------------------
+      - name: Fail test job if fork
+        run: |
+          if [ "${{ github.event.pull_request.head.repo.fork }}" == "true" ]; then
+            echo "This test job requires secrets that PRs from forks will not have access to.  Before this PR can be merged, the tests should be run on an intermediate branch created by repository owners."
+            exit 1
+          fi
+
+      - name: '-------------------------------------------------------------------------------------------------------'
+        run: echo ""
+
+      - name: Setup - Checkout the action
+        uses: actions/checkout@v3
+      
+      - name: Setup - Create Dynamic Tags
+        run: |
+          tag=$(date +'%Y%m%d%H%M%S')
+          npm install
+          branchATag1="1.0.1-${{env.BRANCH_A}}.$tag"
+          branchATag2="1.0.2-${{env.BRANCH_A}}.$tag"
+          branchATag3="1.0.3-${{env.BRANCH_A}}.$tag"
+          branchBTag1="1.1.1-${{env.BRANCH_B}}.$tag"
+          branchBTag2="1.1.2-${{env.BRANCH_B}}.$tag"
+
+          echo "BRANCH_A_TAG_1=$branchATag1" >> $GITHUB_ENV
+          echo "BRANCH_A_TAG_2=$branchATag2" >> $GITHUB_ENV
+          echo "BRANCH_A_TAG_3=$branchATag3" >> $GITHUB_ENV
+          echo "BRANCH_B_TAG_1=$branchBTag1" >> $GITHUB_ENV
+          echo "BRANCH_B_TAG_2=$branchBTag2" >> $GITHUB_ENV
+
+      - name: Setup - Create packages
+        working-directory: test/npm
+        run: |
+          npm set //npm.pkg.github.com/:_authToken '${{ secrets.PACKAGE_TOKEN }}'
+
+          #-----------------------
+          # Regular package versions          
+          #-----------------------
+          # v1.0.0 already exists on the repo
+
+          #-----------------------
+          # Versions for branch 1
+          #-----------------------
+          npm version ${{ env.BRANCH_A_TAG_1 }} --allow-same-version --no-git-tag-version
+          npm install
+          npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_A}}
+
+          npm version ${{ env.BRANCH_A_TAG_2 }} --allow-same-version --no-git-tag-version
+          npm install
+          npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_A}}
+
+          npm version ${{ env.BRANCH_A_TAG_3 }} --allow-same-version --no-git-tag-version
+          npm install
+          npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_A}}
+                    
+          #-----------------------
+          # Versions for branch 2
+          #-----------------------
+          npm version ${{ env.BRANCH_B_TAG_1 }} --allow-same-version --no-git-tag-version
+          npm install
+          npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_B}}
+
+          npm version ${{ env.BRANCH_B_TAG_2 }} --allow-same-version --no-git-tag-version
+          npm install
+          npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_B}}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+
+      - name: Setup - Assert all the packages exist
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const secondsToWait = 5;
+            core.info(`Sleep for ${secondsToWait} seconds to ensure the api has a chance to catch up before we start working on package versions.`);
+            await new Promise(r => setTimeout(r, secondsToWait * 1000));
+
+            const getPackageVersions = require('./test/setup/get-package-versions.js');
+            const packageVersions = await getPackageVersions(github, core);
+
+            const assertPackageVersionExists = require('./test/assert-package-version-exists.js');
+            assertPackageVersionExists(core, packageVersions, '${{ env.PROD_TAG}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_A_TAG_1}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_A_TAG_2}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_A_TAG_3}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_B_TAG_1}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_B_TAG_2}}');
+
+      #--------------------------------------
+      # PASS IN PACKAGE NAMES
+      #--------------------------------------
+      - name: '-------------------------------------------------------------------------------------------------------'
+        run: echo ""
+
+      - name: When delete-branch-package-versions is called with package names
+        uses: ./
+        if: always()
+        id: delete-names
+        with:
+          github-token: ${{ secrets.PACKAGE_TOKEN}}
+          organization: ${{ env.ORG }}
+          repository: ${{ env.REPO }}
+          package-type: npm
+          branch-name: 'refs/heads/branch a' # The action will sanitize this
+          package-names: ' ${{ env.PACKAGE_NAME}}    ' # The action should trim this up
+          strict-match-mode: true
+
+      - name: Then the outcome should be success
+        if: always()
+        run: ./test/assert-values-match.sh --name "step outcome" --expected "success" --actual "${{ steps.delete-names.outcome }}"
+
+      - name: And only versions that match the branch name should have been deleted
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const getPackageVersions = require('./test/setup/get-package-versions.js');
+            const packageVersions = await getPackageVersions(github, core);
+
+            const assertPackageVersionExists = require('./test/assert-package-version-exists.js');
+            const assertPackageVersionDoesNotExist = require('./test/assert-package-version-does-not-exist.js');
+
+            // This main version and branch B should be untouched
+            assertPackageVersionExists(core, packageVersions, '${{ env.PROD_TAG}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_B_TAG_1}}');
+            assertPackageVersionExists(core, packageVersions, '${{ env.BRANCH_B_TAG_2}}');
+
+            // The branch A versions should have been deleted
+            assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_A_TAG_1}}');
+            assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_A_TAG_2}}');
+            assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_A_TAG_3}}');
+
+      #--------------------------------------
+      # DON'T PASS IN PACKAGE NAMES
+      #--------------------------------------
+      - name: '-------------------------------------------------------------------------------------------------------'
+        run: echo ""
+
+      - name: When delete-branch-package-versions is called with defaults
+        uses: ./
+        if: always()
+        id: delete-defaults
+        with:
+          github-token: ${{ secrets.PACKAGE_TOKEN}}
+          package-type: npm
+          branch-name: 'branch'  # Since this doesn't have strict match, it should delete the remaining branch versions
+          strict-match-mode: false
+
+      - name: Then the outcome should be success
+        if: always()
+        run: ./test/assert-values-match.sh --name "step outcome" --expected "success" --actual "${{ steps.delete-defaults.outcome }}"
+
+      - name: And only versions that match the branch name should have been deleted
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const getPackageVersions = require('./test/setup/get-package-versions.js');
+            const packageVersions = await getPackageVersions(github, core);
+
+            const assertPackageVersionExists = require('./test/assert-package-version-exists.js');
+            const assertPackageVersionDoesNotExist = require('./test/assert-package-version-does-not-exist.js');
+
+            // This main version should be untouched
+            assertPackageVersionExists(core, packageVersions, '${{ env.PROD_TAG}}');
+
+            // The branch B versions should have been deleted
+            assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_B_TAG_1}}');
+            assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_B_TAG_2}}');
+      
+      #--------------------------------------
+      # TEARDOWN
+      #--------------------------------------
+      - name: '-------------------------------------------------------------------------------------------------------'
+        run: echo ""
+
+      - name: Packages link
+        run: |
+          echo "The remaining packages can be found here:
+            https://github.com/${{github.repository}}/pkgs/npm/${{ env.PACKAGE_NAME }}/versions
+            Only 1.0.0 should remain."
+      
+      - name: '-------------------------------------------------------------------------------------------------------'
+        run: echo ""

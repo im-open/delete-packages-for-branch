@@ -20,6 +20,10 @@ inputs:
   package-names:
     description: 'The names of the packages that versions will be deleted from. Expects one value or a comma separated list (e.g. package1, package2). If not specified, it will default to all of the packages in the current repo.'
     required: false
+  strict-match-mode:
+    description: 'Flag that determines the pattern the action will use to identify matches in the release name and tag.'
+    required: false
+    default: 'true'
 
 runs:
   using: 'node16'

@@ -1,0 +1,20 @@
+{
+  "name": "@im-open/npm-pkg-to-delete",
+  "version": "0.0.0",
+  "description": "A test npm package that will be deleted.",
+  "main": "main.js",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/im-open/delete-branch-package-versions.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "npm ci"
+  },
+  "author": "wtw",
+  "dependencies": {},
+  "devDependencies": {}
+}
