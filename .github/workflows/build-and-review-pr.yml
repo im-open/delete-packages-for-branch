@@ -92,8 +92,8 @@ jobs:
         run: echo ""
 
       - name: Setup - Checkout the action
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Setup - Create Dynamic Tags
         run: |
           tag=$(date +'%Y%m%d%H%M%S')
@@ -116,7 +116,7 @@ jobs:
           npm set //npm.pkg.github.com/:_authToken '${{ secrets.PACKAGE_TOKEN }}'
 
           #-----------------------
-          # Regular package versions          
+          # Regular package versions
           #-----------------------
           # v1.0.0 already exists on the repo
 
@@ -134,7 +134,7 @@ jobs:
           npm version ${{ env.BRANCH_A_TAG_3 }} --allow-same-version --no-git-tag-version
           npm install
           npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_A}}
-                    
+
           #-----------------------
           # Versions for branch 2
           #-----------------------
@@ -150,7 +150,7 @@ jobs:
 
       - name: Setup - Assert all the packages exist
         if: always()
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const secondsToWait = 5;
@@ -193,7 +193,7 @@ jobs:
 
       - name: And only versions that match the branch name should have been deleted
         if: always()
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const getPackageVersions = require('./test/setup/get-package-versions.js');
@@ -234,7 +234,7 @@ jobs:
 
       - name: And only versions that match the branch name should have been deleted
         if: always()
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const getPackageVersions = require('./test/setup/get-package-versions.js');
@@ -249,7 +249,7 @@ jobs:
             // The branch B versions should have been deleted
             assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_B_TAG_1}}');
             assertPackageVersionDoesNotExist(core, packageVersions, '${{ env.BRANCH_B_TAG_2}}');
-      
+
       #--------------------------------------
       # TEARDOWN
       #--------------------------------------
@@ -261,6 +261,6 @@ jobs:
           echo "The remaining packages can be found here:
             https://github.com/${{github.repository}}/pkgs/npm/${{ env.PACKAGE_NAME }}/versions
             Only 1.0.0 should remain."
-      
+
       - name: '-------------------------------------------------------------------------------------------------------'
         run: echo ""
