@@ -6,7 +6,7 @@ This action will retrieve the list of versions for a GH Package in the provided 
 
 If the action runs into an issue deleting a specific package version, it will generate a warning that can be viewed in the Summary section of the workflow rather than failing.  Errors retrieving the package versions will still cause the action to fail though.
 
-## Index <!--  omit in toc  -->
+## Index <!-- omit in toc -->
 
 - [delete-branch-package-versions](#delete-branch-package-versions)
   - [Inputs](#inputs)
