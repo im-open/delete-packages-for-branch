@@ -113,7 +113,7 @@ jobs:
       - name: Setup - Create packages
         working-directory: test/npm
         run: |
-          npm set //npm.pkg.github.com/:_authToken '${{ secrets.PACKAGE_TOKEN }}'
+          npm set //npm.pkg.github.com/:_authToken '${{ secrets.TEMP_TOKEN }}'
 
           #-----------------------
           # Regular package versions
@@ -146,7 +146,7 @@ jobs:
           npm install
           npm publish --registry=https://npm.pkg.github.com/ --tag refs/heads/${{env.BRANCH_B}}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.TEMP_TOKEN }}
 
       - name: Setup - Assert all the packages exist
         if: always()
@@ -179,7 +179,7 @@ jobs:
         if: always()
         id: delete-names
         with:
-          github-token: ${{ secrets.PACKAGE_TOKEN}}
+          github-token: ${{ secrets.TEMP_TOKEN}}
           organization: ${{ env.ORG }}
           repository: ${{ env.REPO }}
           package-type: npm
@@ -223,7 +223,7 @@ jobs:
         if: always()
         id: delete-defaults
         with:
-          github-token: ${{ secrets.PACKAGE_TOKEN}}
+          github-token: ${{ secrets.TEMP_TOKEN}}
           package-type: npm
           branch-name: 'branch'  # Since this doesn't have strict match, it should delete the remaining branch versions
           strict-match-mode: false

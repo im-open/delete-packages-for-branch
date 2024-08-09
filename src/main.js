@@ -83,13 +83,13 @@ async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVer
   //If nothing was sent in for this arg, default to gathering info for all packages.
   if (packagesWithVersionsToDelete.length !== 0) {
     const packageString = packagesWithVersionsToDelete.join('\n\t$');
-    const message = `\nThe action was provided with package names and will look for versions to delete in the following packages:\n\t${packageString}`;
+    const message = `The action was provided with package names and will look for versions to delete in the following packages:\n\t${packageString}`;
     core.info(message);
     return packagesWithVersionsToDelete;
   }
 
   const orgAndRepo = `${org}/${repo}`;
-  core.info('Querying for all of the packages in the repo.\n');
+  core.info('Querying for all of the packages in the repo.');
   await octokit
     .paginate(octokit.rest.packages.listPackagesForOrganization, { package_type: packageType, org: org })
     .then(packages => {
@@ -101,7 +101,7 @@ async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVer
       if (repoPackages && repoPackages.length > 0) {
         packagesWithVersionsToDelete = repoPackages.map(p => p.name);
         const packageString = packagesWithVersionsToDelete.join('\n\t$');
-        core.info(`\nThe action will look for versions to delete in the following packages:\n\t${packageString}`);
+        core.info(`The action will look for versions to delete in the following packages:\n\t${packageString}`);
       } else {
         packagesWithVersionsToDelete = [];
         core.info(`No packages were found in the ${orgAndRepo} repository.`);
@@ -115,15 +115,16 @@ async function getPackagesInRepoToReview(org, repo, packageType, packagesWithVer
 }
 
 async function run() {
-  core.info(`Begin deleting package versions...`);
-  core.info(`Repo: ${org}/${repo}`);
-  core.info('Package Names: ${packagesWithVersionsToDelete.join(', ')}');
-  core.info(`Strict match mode: ${strictMatchMode}`);
-  core.info(`Branch name input: '${branchNameInput}'`);
-  core.info(`Sanitized Branch name: '${branchName}'`);
-  core.info(`Pattern to match: '${branchPattern}'`);
-
+  core.info(`Determine which versions to delete...`);
   const packagesToReview = await getPackagesInRepoToReview(org, repo, packageType, packagesWithVersionsToDelete);
+
+  core.info(`\nRunning delete-branch-package-versions with the following settings...`);
+  core.info(`\tRepo: ${org}/${repo}`);
+  core.info(`\tPackage Names: ${packagesToReview.join(', ')}`);
+  core.info(`\tStrict match mode: ${strictMatchMode}`);
+  core.info(`\tBranch name input: '${branchNameInput}'`);
+  core.info(`\tSanitized Branch name: '${branchName}'`);
+  core.info(`\tPattern to match: '${branchPattern}'`);
 
   for (const pkgName of packagesToReview) {
     const pkgVersionsToDelete = await getVersionsToDeleteForPackage(org, pkgName, packageType);
