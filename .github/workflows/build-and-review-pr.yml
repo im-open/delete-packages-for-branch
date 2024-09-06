@@ -89,7 +89,8 @@ jobs:
           fi
 
       - name: '-------------------------------------------------------------------------------------------------------'
-        run: echo ""
+        run: |
+          echo "useless change here"
 
       - name: Setup - Checkout the action
         uses: actions/checkout@v3
